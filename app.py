@@ -588,8 +588,9 @@ def main_chat_page():
         if chats:
             options = [f"Chat {chat_id}" for chat_id in chats[:10]]
             selected_chat = st.selectbox("Select Chat", options, index=None, key="chat_selector")
-            if selected_chat:
+            if selected_chat and not st.session_state.loaded_chat:
                 st.warning("⚠️ Please click 'Load Chat' to display the selected chat.")
+            if selected_chat:
                 if st.button("📂 Load", key="load_chat_btn"):
                     load_selected_chat(int(selected_chat.split()[1]))
                 if st.session_state.loaded_chat:
