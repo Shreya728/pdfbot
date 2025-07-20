@@ -11,7 +11,6 @@ import os
 from typing import List, Dict, Any
 import torch
 
-# Set up logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -23,7 +22,6 @@ class ChromaVectorDatabase:
     def __init__(self, model_name: str = "all-MiniLM-L6-v2", persist_directory: str = "chroma_db"):
         logger.info("Initializing ChromaVectorDatabase...")
         try:
-            # Explicitly set device to CPU to avoid meta tensor issues
             device = 'cpu'
             logger.info(f"Loading SentenceTransformer model '{model_name}' on device: {device}")
             self.model = SentenceTransformer(model_name, device=device)
@@ -32,7 +30,6 @@ class ChromaVectorDatabase:
             logger.error(f"Failed to load model {model_name}: {str(e)}")
             raise
         self.persist_directory = persist_directory
-        # Ensure persist_directory exists
         try:
             os.makedirs(persist_directory, exist_ok=True)
             logger.info(f"Created/verified persist directory: {persist_directory}")
@@ -91,9 +88,9 @@ class ChromaVectorDatabase:
             distances = results['distances'][0]
             docs = []
             for i, (doc_content, meta, distance) in enumerate(zip(documents, metadatas, distances)):
-                if distance < (1 - threshold):  # Convert similarity threshold to distance
+                if distance < (1 - threshold):
                     meta_copy = meta.copy() if meta else {}
-                    meta_copy["similarity_score"] = 1 - distance  # Convert distance to similarity
+                    meta_copy["similarity_score"] = 1 - distance
                     docs.append(Document(page_content=doc_content, metadata=meta_copy))
             logger.info(f"Found {len(docs)} relevant documents")
             return docs
