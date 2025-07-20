@@ -9,40 +9,23 @@ from sentence_transformers import SentenceTransformer
 import logging
 import os
 from typing import List, Dict, Any
-import torch
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[logging.FileHandler('app.log'), logging.StreamHandler()]
-)
+# Set up logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class ChromaVectorDatabase:
     def __init__(self, model_name: str = "all-MiniLM-L6-v2", persist_directory: str = "chroma_db"):
         logger.info("Initializing ChromaVectorDatabase...")
         try:
-            device = 'cpu'
-            logger.info(f"Loading SentenceTransformer model '{model_name}' on device: {device}")
-            self.model = SentenceTransformer(model_name, device=device)
+            self.model = SentenceTransformer(model_name)
             logger.info(f"Loaded model: {model_name}")
         except Exception as e:
             logger.error(f"Failed to load model {model_name}: {str(e)}")
             raise
         self.persist_directory = persist_directory
-        try:
-            os.makedirs(persist_directory, exist_ok=True)
-            logger.info(f"Created/verified persist directory: {persist_directory}")
-        except Exception as e:
-            logger.error(f"Failed to create persist directory {persist_directory}: {str(e)}")
-            raise
-        try:
-            self.client = chromadb.Client(Settings(persist_directory=persist_directory))
-            self.collection = self.client.get_or_create_collection(name="document_embeddings")
-            logger.info("Chroma client initialized successfully")
-        except Exception as e:
-            logger.error(f"Failed to initialize Chroma client: {str(e)}")
-            raise
+        self.client = chromadb.Client(Settings(persist_directory=persist_directory))
+        self.collection = self.client.get_or_create_collection(name="document_embeddings")
         self.text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200, length_function=len)
         logger.info("ChromaVectorDatabase initialized successfully!")
 
@@ -59,7 +42,7 @@ class ChromaVectorDatabase:
                 return
             texts = [chunk.page_content for chunk in chunks]
             metadata = [chunk.metadata for chunk in chunks]
-            embeddings = self.model.encode(texts, show_progress_bar=True, batch_size=32, device='cpu').tolist()
+            embeddings = self.model.encode(texts, show_progress_bar=True, batch_size=32).tolist()
             ids = [f"doc_{i}" for i in range(len(chunks))]
             self.collection.add(
                 embeddings=embeddings,
@@ -78,7 +61,7 @@ class ChromaVectorDatabase:
             return []
         logger.info(f"Searching for query: '{query[:50]}...' (k={k})")
         try:
-            query_embedding = self.model.encode([query], device='cpu').tolist()
+            query_embedding = self.model.encode([query]).tolist()
             results = self.collection.query(
                 query_embeddings=query_embedding,
                 n_results=k
@@ -88,9 +71,9 @@ class ChromaVectorDatabase:
             distances = results['distances'][0]
             docs = []
             for i, (doc_content, meta, distance) in enumerate(zip(documents, metadatas, distances)):
-                if distance < (1 - threshold):
+                if distance < (1 - threshold):  # Convert similarity threshold to distance
                     meta_copy = meta.copy() if meta else {}
-                    meta_copy["similarity_score"] = 1 - distance
+                    meta_copy["similarity_score"] = 1 - distance  # Convert distance to similarity
                     docs.append(Document(page_content=doc_content, metadata=meta_copy))
             logger.info(f"Found {len(docs)} relevant documents")
             return docs
